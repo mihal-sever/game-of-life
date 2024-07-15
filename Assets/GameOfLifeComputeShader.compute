@@ -1,0 +1,58 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+Texture2D<float4> InputTexture;
+
+int2 resolution;
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+  int2 coord = id.xy;
+
+  if (coord.x >= resolution.x || coord.y >= resolution.y)
+    return;
+
+  // Get the current cell's state
+  float self = InputTexture.Load(int3(coord, 0)).a;
+
+  // Calculate the number of alive neighbors
+  int neighbours = 0;
+  neighbours += int(InputTexture.Load(int3(coord + int2(-1, 0), 0)).a);
+  neighbours += int(InputTexture.Load(int3(coord + int2(1, 0), 0)).a);
+  neighbours += int(InputTexture.Load(int3(coord + int2(0, 1), 0)).a);
+  neighbours += int(InputTexture.Load(int3(coord + int2(0, -1), 0)).a);
+  neighbours += int(InputTexture.Load(int3(coord + int2(-1, -1), 0)).a);
+  neighbours += int(InputTexture.Load(int3(coord + int2(-1, 1), 0)).a);
+  neighbours += int(InputTexture.Load(int3(coord + int2(1, -1), 0)).a);
+  neighbours += int(InputTexture.Load(int3(coord + int2(1, 1), 0)).a);
+
+  float4 result;
+
+  // Apply the Game of Life rules
+  if (self > 0.5)
+  {
+    if (neighbours == 2 || neighbours == 3)
+    {
+      result = float4(1, 1, 1, 1);
+    }
+    else
+    {
+      result = float4(0, 0, 0, 0);
+    }
+  }
+  else
+  {
+    if (neighbours == 3)
+    {
+      result = float4(1, 1, 1, 1);
+    }
+    else
+    {
+      result = float4(0, 0, 0, 0);
+    }
+  }
+
+  // Write the result to the output texture
+  Result[coord] = result;
+}

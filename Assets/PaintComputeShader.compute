@@ -1,0 +1,78 @@
+#pragma kernel Update
+#pragma kernel InitBackground
+
+RWTexture2D<float4> _Canvas;
+uint _CanvasWidth;
+uint _CanvasHeight;
+uint _GridWidth;
+uint _GridHeight;
+uint _CellSize;
+float4 _MousePosition;
+bool _MouseDown;
+float4 _BrushColour;
+float4 _BackgroundColour;
+float4 _GridLineColor;
+
+float4 HardBrush(float2 pixelPos, float4 currentColor, float4 brushColor, uint cellSize, float2 mousePosition, uint gridOffsetX, uint gridOffsetY)
+{
+    float2 localMousePos = mousePosition - float2(gridOffsetX, gridOffsetY);
+    float2 cellPos = floor(localMousePos / cellSize) * cellSize + float2(gridOffsetX, gridOffsetY);
+
+    if (pixelPos.x >= cellPos.x && pixelPos.x < cellPos.x + cellSize &&
+        pixelPos.y >= cellPos.y && pixelPos.y < cellPos.y + cellSize)
+    {
+        return brushColor;
+    }
+
+    return currentColor;
+}
+
+[numthreads(8,8,1)]
+void InitBackground(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _CanvasWidth || id.y >= _CanvasHeight)
+        return;
+
+    uint gridOffsetX = (_CanvasWidth - _GridWidth * _CellSize) / 2;
+    uint gridOffsetY = (_CanvasHeight - _GridHeight * _CellSize) / 2;
+    
+    if (id.x < gridOffsetX || id.x >= _CanvasWidth - gridOffsetX || id.y < gridOffsetY || id.y >= _CanvasHeight - gridOffsetY)
+    {
+        _Canvas[id.xy] = _BackgroundColour;
+        return;
+    }
+
+    uint localX = id.x - gridOffsetX;
+    uint localY = id.y - gridOffsetY;
+    uint cellSize = _CellSize;
+    
+    float2 cellPos = floor(float2(localX, localY) / cellSize) * cellSize;
+    if (localX == cellPos.x || localY == cellPos.y ||
+        localX == cellPos.x + cellSize - 1 || localY == cellPos.y + cellSize - 1)
+    {
+        _Canvas[id.xy] = _GridLineColor;
+    }
+    else
+    {
+        _Canvas[id.xy] = _BackgroundColour;
+    }
+}
+
+[numthreads(8,8,1)]
+void Update(uint3 id : SV_DispatchThreadID)
+{
+    if (!_MouseDown)
+        return;
+
+    if (id.x >= _CanvasWidth || id.y >= _CanvasHeight)
+        return;
+
+    uint gridOffsetX = (_CanvasWidth - _GridWidth * _CellSize) / 2;
+    uint gridOffsetY = (_CanvasHeight - _GridHeight * _CellSize) / 2;
+
+    if (id.x < gridOffsetX || id.x >= _CanvasWidth - gridOffsetX || id.y < gridOffsetY || id.y >= _CanvasHeight - gridOffsetY)
+        return;
+
+    uint cellSize = _CellSize;
+    _Canvas[id.xy] = HardBrush(id.xy, _Canvas[id.xy], _BrushColour, cellSize, _MousePosition.xy, gridOffsetX, gridOffsetY);
+}
